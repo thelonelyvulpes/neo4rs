@@ -4,6 +4,7 @@ use bytes::*;
 use std::cell::RefCell;
 use std::convert::From;
 use std::fmt::Display;
+use std::hash::Hash;
 use std::mem;
 use std::rc::Rc;
 
@@ -30,6 +31,18 @@ impl BoltString {
             || marker == SMALL
             || marker == MEDIUM
             || marker == LARGE
+    }
+}
+
+impl std::borrow::Borrow<str> for BoltString {
+    fn borrow(&self) -> &str {
+        self.value.as_str()
+    }
+}
+
+impl std::borrow::Borrow<String> for BoltString {
+    fn borrow(&self) -> &String {
+        &self.value
     }
 }
 

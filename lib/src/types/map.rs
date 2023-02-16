@@ -3,10 +3,11 @@ use crate::types::*;
 use crate::version::Version;
 use bytes::*;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::hash_map;
 use std::convert::TryInto;
-use std::iter::FromIterator;
+use std::hash::Hash;
 
+use ahash::AHashMap;
 use std::mem;
 use std::rc::Rc;
 
@@ -17,13 +18,13 @@ pub const LARGE: u8 = 0xDA;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BoltMap {
-    pub value: HashMap<BoltString, BoltType>,
+    pub value: AHashMap<BoltString, BoltType>,
 }
 
 impl Default for BoltMap {
     fn default() -> Self {
         BoltMap {
-            value: HashMap::new(),
+            value: AHashMap::new(),
         }
     }
 }
@@ -31,7 +32,7 @@ impl Default for BoltMap {
 impl BoltMap {
     pub fn with_capacity(capacity: usize) -> Self {
         BoltMap {
-            value: HashMap::with_capacity(capacity),
+            value: AHashMap::with_capacity(capacity),
         }
     }
 
@@ -65,7 +66,7 @@ impl BoltMap {
     }
 }
 
-impl FromIterator<(BoltString, BoltType)> for BoltMap {
+impl std::iter::FromIterator<(BoltString, BoltType)> for BoltMap {
     fn from_iter<T>(iter: T) -> Self
     where
         T: IntoIterator<Item = (BoltString, BoltType)>,
@@ -75,6 +76,26 @@ impl FromIterator<(BoltString, BoltType)> for BoltMap {
             bolt_map.put(s, t);
         }
         bolt_map
+    }
+}
+
+impl IntoIterator for BoltMap {
+    type Item = (BoltString, BoltType);
+    type IntoIter = hash_map::IntoIter<BoltString, BoltType>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.value.into_iter()
+    }
+}
+
+impl<Q: Eq + Hash + ?Sized> std::ops::Index<&Q> for BoltMap
+    where BoltString: std::borrow::Borrow<Q>,
+{
+    type Output = BoltType;
+
+    #[inline]
+    fn index(&self, key: &Q) -> &Self::Output {
+        self.value.index(key)
     }
 }
 
@@ -214,5 +235,16 @@ mod tests {
         assert_eq!(bytes.borrow()[0], LARGE);
         let deserialized_map: BoltMap = BoltMap::parse(Version::V4_1, bytes).unwrap();
         assert_eq!(map, deserialized_map);
+    }
+
+    #[test]
+    fn should_access_with_index() {
+        let mut map = BoltMap::default();
+        for i in 0..=10 {
+            map.put(i.to_string().into(), (i*2).to_string().into());
+        }
+
+        let val = &map[&BoltString::new("10")];
+        assert_eq!("20".to_string(), val.to_string());
     }
 }
